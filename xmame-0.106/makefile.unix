@@ -111,6 +111,7 @@ CC	= @gcc
 HOST_CC = $(CC)
 # HOST_CC = @gcc
 
+OL_DIR = /home/jvangrin/openlase/openlase
 
 ###########################################################################
 # Reset CFLAGS
@@ -127,7 +128,7 @@ CFLAGS =
 ###########################################################################
 
 # GCC on x86
-CFLAGS = -O2
+CFLAGS = -O2 -I$(OL_DIR)/include
 
 # GCC on x86 with some optimizations
 # CFLAGS = -O2 -mtune=i686 -fomit-frame-pointer -fstrength-reduce -ffast-math
@@ -783,7 +784,7 @@ X11_XV = 1
 
 # Standard location for XFree86
 X11INC		= -I/usr/X11R6/include
-X11LIB		= -L/usr/X11R6/lib
+X11LIB		= -L/usr/X11R6/lib -L$(OL_DIR)/build/libol -lopenlase
 
 # Standard location for Sun systems
 # X11INC		= -I/usr/openwin/include
