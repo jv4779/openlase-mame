@@ -37,8 +37,6 @@
 #include "artwork.h"
 
 #include "libol.h"
-#define XSCALE (1.0 / (xmax / 2.0))
-#define YSCALE (-1.0 / (ymax / 2.0))
 
 #define MAX_DIRTY_PIXELS (2*MAX_PIXELS)
 
@@ -250,7 +248,7 @@ VIDEO_START( vector )
         params.start_wait = 12;
         params.start_dwell = 3;
         params.curve_dwell = 0;
-        params.corner_dwell = 12;
+        params.corner_dwell = 3;
         params.curve_angle = cosf(30.0*(M_PI/180.0)); // 30 deg
         params.end_dwell = 3;
         params.end_wait = 10;
@@ -264,8 +262,6 @@ VIDEO_START( vector )
         olSetRenderParams(&params);
 
         olLoadIdentity();
-        olTranslate(-1,1);
-        olScale(XSCALE, YSCALE);
 
 	return 0;
 }
@@ -279,12 +275,35 @@ static void vector_clear_pixels (void)
 	vector_pixel_t coords;
 	int i;
 
-olEnd();
+#ifdef LIBOL_H
+	// end and render the current frame
+	olEnd();
+	olRenderFrame(1000);
 
-olRenderFrame(1000);
-olLoadIdentity();
-olTranslate(-1,1);
-olScale(XSCALE, YSCALE);
+	// setup the scaling and translation for the next frame
+	int ol_xmax=xmax, ol_ymax=ymax;
+	if ( Machine->gamedrv->flags & ORIENTATION_SWAP_XY ) {
+		int tmp=ol_xmax;
+		ol_xmax=ol_ymax;
+		ol_ymax=tmp;
+	}
+
+	float xscale,yscale;
+	float xoffset=0,yoffset=0;
+
+	if ( ol_xmax < ol_ymax ) {
+		xscale = 1.0 / (ol_ymax / 2.0);
+		yscale = -xscale;
+		xoffset = (ol_ymax-ol_xmax)/(float)ol_ymax;
+	} else {
+		xscale = 1.0 / (ol_xmax / 2.0);
+		yscale = -xscale;
+		yoffset = (ol_xmax-ol_ymax)/(float)ol_xmax;
+	}
+	olLoadIdentity();
+	olTranslate(-1+xoffset,1-yoffset);
+	olScale(xscale, yscale);
+#endif
 
 	if (Machine->color_depth == 32)
 	{
@@ -400,11 +419,31 @@ void vector_draw_to(int x2, int y2, rgb_t col, int intensity, int dirty, rgb_t (
 
 	/* [3] handle color and intensity */
 
-if ( intensity == 0 ) {
-	olEnd();
-	olBegin(OL_LINESTRIP);
-}
-olVertex(x2,y2,C_WHITE);
+#ifdef LIBOL_H
+	if ( intensity == 0 ) {
+		olEnd();
+		olBegin(OL_LINESTRIP);
+	}
+
+	int ol_x=x2, ol_y=y2;
+	int ol_xmax=xmax, ol_ymax=ymax;
+	if ( Machine->gamedrv->flags & ORIENTATION_SWAP_XY ) {
+		int tmp=ol_x;
+		ol_x=ol_y;
+		ol_y=tmp;
+
+		tmp=ol_xmax;
+		ol_xmax=ol_ymax;
+		ol_ymax=tmp;
+	}
+	if ( Machine->gamedrv->flags & ORIENTATION_FLIP_X ) {
+		ol_x = ol_xmax - ol_x;
+	}
+	if ( Machine->gamedrv->flags & ORIENTATION_FLIP_Y ) {
+		ol_y = ol_ymax - ol_y;
+	}
+	olVertex(ol_x,ol_y,col);
+#endif
 
 	if (intensity == 0) goto end_draw;
 
