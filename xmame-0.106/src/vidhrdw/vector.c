@@ -37,6 +37,7 @@
 #include "artwork.h"
 
 #include "libol.h"
+//#define PRINT_VECTORS
 
 #define MAX_DIRTY_PIXELS (2*MAX_PIXELS)
 
@@ -274,7 +275,9 @@ static void vector_clear_pixels (void)
 {
 	vector_pixel_t coords;
 	int i;
-
+#ifdef PRINT_VECTORS
+	printf("clear\n");
+#endif
 #ifdef LIBOL_H
 	// end and render the current frame
 	olEnd();
@@ -443,6 +446,7 @@ void vector_draw_to(int x2, int y2, rgb_t col, int intensity, int dirty, rgb_t (
 		ol_y = ol_ymax - ol_y;
 	}
 	olVertex(ol_x,ol_y,col);
+
 #endif
 
 	if (intensity == 0) goto end_draw;
@@ -565,12 +569,73 @@ end_draw:
 
 int vector_logging = 0;
 
+static int lx=0,ly=0;
+static int v_hash=0;
+static int v_len=0;
+
+static const int skip[][2] = {
+    // Asteroid
+    {26214400+(53870592>>16),30}, //c 1979 ATARI
+    {3670016+(17694720>>16),258}, //YOUR SCORE IS ONE OF THE TEN BEST
+
+    // Tempest
+    {4774400+(12802560>>16),28}, //c MCMLXXX ATARI
+    {31669760+(12802560>>16),28}, //c MCMLXXX ATARI (mode select)
+    {3468800+(11366400>>16),29}, //BONUS EVERY 20000
+    {20311040+(13585920>>16),27}, //rate yourself
+    {19005440+(11235840>>16),32}, //spin knob to change
+    {17699840+(10844160>>16),41}, //press fire to select
+    {0,0}
+ };
+static int left_to_skip=0;
+static int skip_this_vector=0;
+
 /*
  * Adds a line end point to the vertices list. The vector processor emulation
  * needs to call this.
  */
 void vector_add_point (int x, int y, rgb_t color, int intensity)
 {
+	if ( intensity == 0 ) {
+		lx=x; ly=y;
+		if ( v_len > 0 ) {
+#ifdef PRINT_VECTORS
+			printf("end,%d,%d\n",v_len,v_hash);
+#endif
+			v_len=0;
+			v_hash=0;
+		}
+
+                if ( left_to_skip <= 0 ) {
+		    int i;
+                    for (i=0; skip[i][0]; ++i ) {
+                        if ( skip[i][0] == (x+(y>>16)) ) {
+			    left_to_skip=skip[i][1];
+                            skip_this_vector=1;
+                            break;
+                        }
+                    }
+                } else {
+                    --left_to_skip;
+                    if ( left_to_skip <= 0 ) {
+                        skip_this_vector=0;
+                    }
+                }
+#ifdef PRINT_VECTORS
+		printf("start,%d,%d,%d\n",x,y,left_to_skip);
+#endif
+	} else {
+#ifdef PRINT_VECTORS
+		printf("point,%d,%d,%d,%d,%d\n",lx-x,ly-y,color,intensity,left_to_skip);
+#endif
+		v_len += 1;
+		v_hash += abs(lx-x)+abs(ly-y);
+	}
+
+        if ( skip_this_vector ) {
+            return;
+	}
+
 	point *newpoint;
 
 	intensity *= intensity_correction;
