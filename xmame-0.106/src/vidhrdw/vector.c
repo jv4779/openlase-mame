@@ -180,6 +180,33 @@ float vector_get_intensity(void)
 	return intensity_correction;
 }
 
+#ifdef LIBOL_H
+typedef int (skip_array_type)[][3];
+
+static const skip_array_type no_skip = {
+    {0,0}
+};
+static const skip_array_type asteroid_skip = {
+    // Asteroid
+    {26214400,53870592,30}, //c 1979 ATARI
+    {3670016,17694720,258}, //YOUR SCORE IS ONE OF THE TEN BEST
+    {0,0}
+};
+static const skip_array_type tempest_skip = {
+    // Tempest
+    {4774400,12802560,28}, //c MCMLXXX ATARI
+    {31669760,12802560,28}, //c MCMLXXX ATARI (mode select)
+    {3468800,11366400,29}, //BONUS EVERY 20000
+    {20311040,13585920,27}, //rate yourself
+    {19005440,11235840,33}, //spin knob to change
+    {17699840,10844160,41}, //press fire to select
+    {0,0}
+};
+
+static const skip_array_type *vector_skip = &no_skip;
+
+#endif
+
 /*
  * Initializes vector game video emulation
  */
@@ -240,6 +267,7 @@ VIDEO_START( vector )
 	/* make sure we reset the list */
 	vector_dirty_list[0] = VECTOR_PIXEL_END;
 
+#ifdef LIBOL_H
         OLRenderParams params;
 
         memset(&params, 0, sizeof params);
@@ -264,6 +292,13 @@ VIDEO_START( vector )
 
         olLoadIdentity();
 
+	if( strcmp( Machine->gamedrv->name, "asteroid" ) == 0 ) {
+		vector_skip = &asteroid_skip;
+	}
+	else if( strcmp( Machine->gamedrv->name, "tempest" ) == 0 ) {
+		vector_skip = &tempest_skip;
+	}
+#endif
 	return 0;
 }
 
@@ -569,33 +604,20 @@ end_draw:
 
 int vector_logging = 0;
 
-static int lx=0,ly=0;
-static int v_hash=0;
-static int v_len=0;
-
-static const int skip[][2] = {
-    // Asteroid
-    {26214400+(53870592>>16),30}, //c 1979 ATARI
-    {3670016+(17694720>>16),258}, //YOUR SCORE IS ONE OF THE TEN BEST
-
-    // Tempest
-    {4774400+(12802560>>16),28}, //c MCMLXXX ATARI
-    {31669760+(12802560>>16),28}, //c MCMLXXX ATARI (mode select)
-    {3468800+(11366400>>16),29}, //BONUS EVERY 20000
-    {20311040+(13585920>>16),27}, //rate yourself
-    {19005440+(11235840>>16),32}, //spin knob to change
-    {17699840+(10844160>>16),41}, //press fire to select
-    {0,0}
- };
-static int left_to_skip=0;
-static int skip_this_vector=0;
-
 /*
  * Adds a line end point to the vertices list. The vector processor emulation
  * needs to call this.
  */
 void vector_add_point (int x, int y, rgb_t color, int intensity)
 {
+#ifdef LIBOL_H
+	static int lx=0,ly=0;
+	static int v_hash=0;
+	static int v_len=0;
+
+	static int left_to_skip=0;
+	static int skip_this_vector=0;
+
 	if ( intensity == 0 ) {
 		lx=x; ly=y;
 		if ( v_len > 0 ) {
@@ -608,13 +630,15 @@ void vector_add_point (int x, int y, rgb_t color, int intensity)
 
                 if ( left_to_skip <= 0 ) {
 		    int i;
-                    for (i=0; skip[i][0]; ++i ) {
-                        if ( skip[i][0] == (x+(y>>16)) ) {
-			    left_to_skip=skip[i][1];
-                            skip_this_vector=1;
-                            break;
-                        }
-                    }
+		    for (i=0; (*vector_skip)[i][0]; ++i ) {
+			if ( (*vector_skip)[i][0] == x &&
+			     (*vector_skip)[i][1] == y )
+			{
+			    left_to_skip=(*vector_skip)[i][2];
+			    skip_this_vector=1;
+			    break;
+			}
+		    }
                 } else {
                     --left_to_skip;
                     if ( left_to_skip <= 0 ) {
@@ -635,6 +659,7 @@ void vector_add_point (int x, int y, rgb_t color, int intensity)
         if ( skip_this_vector ) {
             return;
 	}
+#endif
 
 	point *newpoint;
 
